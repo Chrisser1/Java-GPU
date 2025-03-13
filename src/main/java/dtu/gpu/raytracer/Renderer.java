@@ -8,6 +8,9 @@ import java.util.List;
 import org.jocl.*;
 
 public class Renderer {
+    private boolean debug = false;
+    private int samplesPrPixel = 50;
+    private int maxDepth = 10;
     private int width, height;
     private BufferedImage image;
     private OpenCLManager openCLManager;
@@ -26,13 +29,27 @@ public class Renderer {
         cl_mem[] sphereBuffers = createSphereBuffers(scene);
         int numSpheres = scene.getSpheres().size();
         cl_kernel kernel = openCLManager.getKernel();
-        // Set sphere buffers as kernel arguments
+
         clSetKernelArg(kernel, 7, Sizeof.cl_mem, Pointer.to(sphereBuffers[0])); // centerX
         clSetKernelArg(kernel, 8, Sizeof.cl_mem, Pointer.to(sphereBuffers[1])); // centerY
         clSetKernelArg(kernel, 9, Sizeof.cl_mem, Pointer.to(sphereBuffers[2])); // centerZ
         clSetKernelArg(kernel, 10, Sizeof.cl_mem, Pointer.to(sphereBuffers[3])); // radii
         clSetKernelArg(kernel, 11, Sizeof.cl_mem, Pointer.to(sphereBuffers[4])); // materialIndices
-        clSetKernelArg(kernel, 12, Sizeof.cl_int, Pointer.to(new int[]{ numSpheres }));
+
+        clSetKernelArg(kernel, 12, Sizeof.cl_mem, Pointer.to(sphereBuffers[5])); // albedoR
+        clSetKernelArg(kernel, 13, Sizeof.cl_mem, Pointer.to(sphereBuffers[6])); // albedoG
+        clSetKernelArg(kernel, 14, Sizeof.cl_mem, Pointer.to(sphereBuffers[7])); // albedoB
+        clSetKernelArg(kernel, 15, Sizeof.cl_mem, Pointer.to(sphereBuffers[8])); // fuzz
+        clSetKernelArg(kernel, 16, Sizeof.cl_mem, Pointer.to(sphereBuffers[9])); // refIdx
+        clSetKernelArg(kernel, 17, Sizeof.cl_int, Pointer.to(new int[]{ numSpheres }));
+
+
+        // Convert the boolean to an int: 1 for true, 0 for false
+        int debugFlag = debug ? 1 : 0;
+        clSetKernelArg(kernel, 18, Sizeof.cl_int, Pointer.to(new int[] { debugFlag }));
+        clSetKernelArg(kernel, 19, Sizeof.cl_int, Pointer.to(new int[] { samplesPrPixel }));
+        clSetKernelArg(kernel, 20, Sizeof.cl_int, Pointer.to(new int[] { maxDepth }));
+
 
         long[] globalWorkSize = { width, height };
         clEnqueueNDRangeKernel(openCLManager.getCommandQueue(),
@@ -43,7 +60,6 @@ public class Renderer {
                 CL_TRUE, 0, (long) Sizeof.cl_int * width * height, Pointer.to(pixelData), 0, null, null);
         image.setRGB(0, 0, width, height, pixelData, 0, width);
 
-        // Release sphere buffers
         for (cl_mem buffer : sphereBuffers) {
             clReleaseMemObject(buffer);
         }
@@ -104,41 +120,55 @@ public class Renderer {
         int numSpheres = sphereList.size();
         if (numSpheres == 0) {
             numSpheres = 1;
-            sphereList.add(new Sphere(new Vector3(0, 0, -1000), 0.0, 0)); // dummy sphere
+            sphereList.add(new Sphere(
+                    new Vector3(0, -100.5, -1), 100, 0,
+                    new Vector3(0.8, 0.8, 0.0)));  // Ground (lambertian)
         }
 
         float[] centerX = new float[numSpheres];
         float[] centerY = new float[numSpheres];
         float[] centerZ = new float[numSpheres];
-        float[] radii   = new float[numSpheres];
+        float[] radii = new float[numSpheres];
         int[] materialIndices = new int[numSpheres];
+
+        float[] albedoR = new float[numSpheres];
+        float[] albedoG = new float[numSpheres];
+        float[] albedoB = new float[numSpheres];
+        float[] fuzz = new float[numSpheres];
+        float[] refIdx = new float[numSpheres];
 
         for (int i = 0; i < numSpheres; i++) {
             Sphere s = sphereList.get(i);
             centerX[i] = (float) s.center.getX();
             centerY[i] = (float) s.center.getY();
             centerZ[i] = (float) s.center.getZ();
-            radii[i]   = (float) s.radius;
+            radii[i] = (float) s.radius;
             materialIndices[i] = s.materialIndex;
-//            System.out.printf("Sphere %d: center=(%f, %f, %f), radius=%f, matIdx=%d\n",
-//                    i, centerX[i], centerY[i], centerZ[i], radii[i], materialIndices[i]);
+
+            albedoR[i] = (float) s.albedo.getX();
+            albedoG[i] = (float) s.albedo.getY();
+            albedoB[i] = (float) s.albedo.getZ();
+            fuzz[i] = (float) s.fuzz;
+            refIdx[i] = (float) s.ref_idx;
         }
 
         cl_context context = openCLManager.getContext();
-        cl_mem centerXBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) Sizeof.cl_float * centerX.length, Pointer.to(centerX), null);
-        cl_mem centerYBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) Sizeof.cl_float * centerY.length, Pointer.to(centerY), null);
-        cl_mem centerZBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) Sizeof.cl_float * centerZ.length, Pointer.to(centerZ), null);
-        cl_mem radiiBuffer   = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) Sizeof.cl_float * radii.length, Pointer.to(radii), null);
-        cl_mem materialIndexBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                (long) Sizeof.cl_int * materialIndices.length, Pointer.to(materialIndices), null);
+        cl_mem centerXBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * centerX.length, Pointer.to(centerX), null);
+        cl_mem centerYBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * centerY.length, Pointer.to(centerY), null);
+        cl_mem centerZBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * centerZ.length, Pointer.to(centerZ), null);
+        cl_mem radiiBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * radii.length, Pointer.to(radii), null);
+        cl_mem materialIndexBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_int * materialIndices.length, Pointer.to(materialIndices), null);
 
-        // Return them in an array in a fixed order:
-        // indices: 0=centerX, 1=centerY, 2=centerZ, 3=radii, 4=materialIndices
-        return new cl_mem[] { centerXBuffer, centerYBuffer, centerZBuffer, radiiBuffer, materialIndexBuffer };
+        cl_mem albedoRBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * albedoR.length, Pointer.to(albedoR), null);
+        cl_mem albedoGBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * albedoG.length, Pointer.to(albedoG), null);
+        cl_mem albedoBBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * albedoB.length, Pointer.to(albedoB), null);
+        cl_mem fuzzBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * fuzz.length, Pointer.to(fuzz), null);
+        cl_mem refIdxBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (long) Sizeof.cl_float * refIdx.length, Pointer.to(refIdx), null);
+
+        return new cl_mem[]{
+                centerXBuffer, centerYBuffer, centerZBuffer, radiiBuffer, materialIndexBuffer,
+                albedoRBuffer, albedoGBuffer, albedoBBuffer, fuzzBuffer, refIdxBuffer
+        };
     }
 
     // This method updates the image size and re-allocates the OpenCL buffer.
@@ -151,5 +181,25 @@ public class Renderer {
 
     public BufferedImage getImage() {
         return image;
+    }
+
+    public void setDebug(boolean debug) {
+        this.debug = debug;
+    }
+
+    public int getSamplesPrPixel() {
+        return samplesPrPixel;
+    }
+
+    public void setSamplesPrPixel(int samplesPrPixel) {
+        this.samplesPrPixel = samplesPrPixel;
+    }
+
+    public int getMaxDepth() {
+        return maxDepth;
+    }
+
+    public void setMaxDepth(int maxDepth) {
+        this.maxDepth = maxDepth;
     }
 }

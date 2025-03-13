@@ -25,6 +25,16 @@ public class Vector3 {
         double length = Math.sqrt(x * x + y * y + z * z);
         return new Vector3(x / length, y / length, z / length);
     }
+    public Vector3 cross(Vector3 v) {
+        double cx = this.y * v.z - this.z * v.y;
+        double cy = this.z * v.x - this.x * v.z;
+        double cz = this.x * v.y - this.y * v.x;
+        return new Vector3(cx, cy, cz);
+    }
+    public double length() {
+        return Math.sqrt(x * x + y * y + z * z);
+    }
+
 
     public double getX() {
         return x;

@@ -22,8 +22,6 @@ public class OpenCLManager {
 
     /**
      * Create the OpenCLManager via a given width and height
-     * @param width
-     * @param height
      */
     public OpenCLManager(int width, int height)
     {
@@ -57,9 +55,9 @@ public class OpenCLManager {
         commandQueue = clCreateCommandQueueWithProperties(context, device, properties, null);
 
         // Load kernel source
-        String source = readFile("src/main/resources/kernels/RayTracer.cl");
+        String source = readFile("src/main/resources/kernels/raytracer/raytracer.cl");
         cl_program program = clCreateProgramWithSource(context, 1, new String[]{source}, null, null);
-        clBuildProgram(program, 0, null, "-cl-fast-relaxed-math", null, null);
+        clBuildProgram(program, 0, null, "-I src/main/resources/kernels/raytracer -cl-fast-relaxed-math", null, null);
 
         kernel = clCreateKernel(program, "raytrace", null);
 
@@ -74,8 +72,12 @@ public class OpenCLManager {
 
     public void recreatePixelBuffer(int newWidth, int newHeight)
     {
+        this.width = newWidth;
+        this.height = newHeight;
+
         // Release the old buffer
         clReleaseMemObject(pixelMem);
+
         // Create a new pixel buffer with updated dimensions
         pixelMem = clCreateBuffer(context, CL_MEM_WRITE_ONLY, (long) newWidth * newHeight * Sizeof.cl_int, null, null);
     }
