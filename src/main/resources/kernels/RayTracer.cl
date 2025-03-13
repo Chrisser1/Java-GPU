@@ -127,19 +127,19 @@ __kernel void raytrace(__global int* pixels,
         spheres_local[i] = reconstruct_sphere(i, sphereCenterX, sphereCenterY, sphereCenterZ, sphereRadii, sphereMaterialIndices);
     }
 
-    // Debug printing (only one work-item prints)
-    if (get_global_id(0) == 0 && get_global_id(1) == 0) {
-        printf("Received %d spheres\n", num_spheres);
-        for (int i = 0; i < num_spheres; i++) {
-            printf("Sphere[%d]: Center=(%f, %f, %f), Radius=%f, MatIdx=%d\n",
-                i,
-                spheres_local[i].center.x,
-                spheres_local[i].center.y,
-                spheres_local[i].center.z,
-                spheres_local[i].radius,
-                spheres_local[i].materialIndex);
-        }
-    }
+//    // Debug printing (only one work-item prints)
+//    if (get_global_id(0) == 0 && get_global_id(1) == 0) {
+//        printf("Received %d spheres\n", num_spheres);
+//        for (int i = 0; i < num_spheres; i++) {
+//            printf("Sphere[%d]: Center=(%f, %f, %f), Radius=%f, MatIdx=%d\n",
+//                i,
+//                spheres_local[i].center.x,
+//                spheres_local[i].center.y,
+//                spheres_local[i].center.z,
+//                spheres_local[i].radius,
+//                spheres_local[i].materialIndex);
+//        }
+//    }
 
     int x = get_global_id(0);
     int y = get_global_id(1);

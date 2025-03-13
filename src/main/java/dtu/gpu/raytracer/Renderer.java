@@ -40,7 +40,7 @@ public class Renderer {
 
         int[] pixelData = new int[width * height];
         clEnqueueReadBuffer(openCLManager.getCommandQueue(), openCLManager.getPixelMem(),
-                CL_TRUE, 0, Sizeof.cl_int * width * height, Pointer.to(pixelData), 0, null, null);
+                CL_TRUE, 0, (long) Sizeof.cl_int * width * height, Pointer.to(pixelData), 0, null, null);
         image.setRGB(0, 0, width, height, pixelData, 0, width);
 
         // Release sphere buffers

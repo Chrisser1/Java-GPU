@@ -7,6 +7,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 
 public class RayTracer {
     public static void main(String[] args) {
@@ -45,6 +47,28 @@ public class RayTracer {
                 // Re-render the scene
                 renderer.render(scene);
                 // Update the display
+                imageLabel.setIcon(new ImageIcon(renderer.getImage()));
+                imageLabel.repaint();
+            }
+        });
+
+        frame.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                int key = e.getKeyCode();
+                Vector3 delta = new Vector3(0, 0, 0);
+                // Move forward/backward, left/right with WASD keys.
+                if (key == KeyEvent.VK_W) {
+                    delta = new Vector3(0, 0, -0.1);
+                } else if (key == KeyEvent.VK_S) {
+                    delta = new Vector3(0, 0, 0.1);
+                } else if (key == KeyEvent.VK_A) {
+                    delta = new Vector3(-0.1, 0, 0);
+                } else if (key == KeyEvent.VK_D) {
+                    delta = new Vector3(0.1, 0, 0);
+                }
+                camera.move(delta);
+                renderer.render(scene);
                 imageLabel.setIcon(new ImageIcon(renderer.getImage()));
                 imageLabel.repaint();
             }
