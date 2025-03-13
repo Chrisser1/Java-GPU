@@ -64,7 +64,7 @@ public class OpenCLManager {
         kernel = clCreateKernel(program, "raytrace", null);
 
         // Allocate memory for pixels
-        pixelMem = clCreateBuffer(context, CL_MEM_WRITE_ONLY, width * height * Sizeof.cl_int, null, null);
+        pixelMem = clCreateBuffer(context, CL_MEM_WRITE_ONLY, (long) width * height * Sizeof.cl_int, null, null);
     }
 
     public cl_kernel getKernel() { return kernel; }
